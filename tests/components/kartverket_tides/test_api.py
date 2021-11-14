@@ -1,38 +1,13 @@
-import aiohttp
 import pytest
 from datetime import datetime
 from typing import Callable, Union
+
 
 from homeassistant.components.kartverket_tides.data import (
     parse_tide_data,
     KartverketTideData,
 )
 from homeassistant.components.kartverket_tides.api import KartverketTideApi
-from tests.components.kartverket_tides.const import LATITUDE, LONGITUDE, LANG, INTERVAL
-
-
-@pytest.fixture
-def api_factory(aioclient_mock):
-    """KartveketTideApi factory with defaults or passed kwargs"""
-
-    def _api(**kwargs):
-        api_kwargs = {
-            "lat": LATITUDE,
-            "lon": LONGITUDE,
-            "lang": LANG,
-            "interval": INTERVAL,
-            "websession": aioclient_mock,
-        }
-        api_kwargs.update(**kwargs)
-        return KartverketTideApi(**api_kwargs)
-
-    return _api
-
-
-@pytest.fixture
-def api(api_factory):
-    """KartverketApi with default test values"""
-    return api_factory()
 
 
 def test_parse_tide_data(tide_xml_etree: str):
@@ -54,52 +29,45 @@ def test_parse_tide_data(tide_xml_etree: str):
     assert all([len(tides.data[i].waterlevels) > 0 for i in range(n_data_groups)])
 
 
-# TODO mocking websession here
-async def test_api_init(api_factory: Callable, aioclient_mock):
-    """Test websession is created or reused"""
-    api = api_factory(websession=aioclient_mock)
-    assert isinstance(api.websession, aiohttp.ClientSession)
-
-
-async def test_api_init_nosession(api_factory: Callable):
+async def test_api_init(api_factory: Callable, mock_asyncio_run):
     """Test websession is created or reused"""
     api = api_factory(websession=None)
-    assert isinstance(api.websession, aiohttp.ClientSession)
-
-
-@pytest.mark.parametrize("tzone", [0, 1])
-def test_api_fromtime(api: KartverketTideApi, tzone: int):
-    """Test from time is created from beginning of current hour"""
-    api.tzone = tzone
-    assert api.fromtime.tzname == ("CET" | "CEST" if tzone else "UTC")
+    assert api.websession is not None
+    assert mock_asyncio_run.called
 
 
 @pytest.mark.parametrize(
-    "status,expected_tidetype", [(200, KartverketTideData), (500, None)]
+    "status,expected_tidetype", [(200, KartverketTideData), (500, type(None))]
 )
 async def test_api_updater(
+    api_factory: Callable,
     websession_factory: Callable,
-    tide_xml_string: str,
+    tide_xml_str: str,
     status: int,
     expected_tidetype: Union[KartverketTideApi, None],
 ):
-    websession = websession_factory(status, tide_xml_string)
+    websession = websession_factory(status, tide_xml_str)
     api = api_factory(websession=websession)
-    api.update()
-    assert isinstance(api.tides, expected_tidetype)
+    await api.update()
+    assert isinstance(api.tide_extremes, expected_tidetype)
+    assert isinstance(api.tide_series, expected_tidetype)
 
 
-def test_api_next_extreme(api):
+async def test_api_next_extreme(api):
     """Test valid next tidal time returned"""
-    api.update()
-    assert isinstance(api.next_time, datetime)
+    await api.update()
+    assert isinstance(api.next_extreme[0], datetime)
+    assert isinstance(api.next_extreme[1], str)
+    assert isinstance(api.next_extreme[2], float)
 
 
-def test_api_current_waterlevel(api):
+async def test_api_current_waterlevel(api):
+    await api.update()
     assert isinstance(api.current_waterlevel, float)
 
 
-def test_waterlevel_series(api):
+async def test_waterlevel_series(api):
+    await api.update()
     series = api.waterlevel_series
 
     # Check equal number of timestamps and waterlevels

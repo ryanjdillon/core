@@ -1,0 +1,9 @@
+{
+  "domain": "kartverket_tides",
+  "name": "Kartverket Tides",
+  "documentation": "https://www.home-assistant.io/integrations/kartverket_tides",
+  "codeowners": ["@ryanjdillon"],
+  "iot_class": "cloud_polling",
+  "manifest_version": 2,
+  "version": "0.0.1"
+}
