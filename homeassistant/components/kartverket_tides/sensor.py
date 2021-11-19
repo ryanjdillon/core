@@ -1,52 +1,48 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
+from typing import Union
 
 import voluptuous as vol
 
-import homeassistant.helpers.config_validation as cv
-import homeassistant.util.dt as dt_util
-from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+import homeassistant.helpers.config_validation as cv
 from homeassistant.util import Throttle
-
 from homeassistant.components.kartverket_tides.api import (
     KartverketTideApi,
-    KystverketTideData,
+    KartverketTideData,
 )
-from homeassistant.const import (
-    ATTR_ATTRIBUTION,
-    CONF_LATITUDE,
-    CONF_LONGITUDE,
-    CONF_NAME,
-    LENGTH_CM,
+from homeassistant.components.kartverket_tides.const import (
+    ATTRIBUTION,
+    ATTR_NEXT_HIGH_TIME,
+    ATTR_NEXT_HIGH_LEVEL,
+    ATTR_NEXT_LOW_TIME,
+    ATTR_NEXT_LOW_LEVEL,
+    ATTR_INCREASING_TEXT,
+    CONF_ENABLE_UTC,
+    CONF_INTERVAL,
+    CONF_LANG,
+    ICONS,
+    DEFAULT_ICON_KEY,
+    DEFAULT_NAME,
+    SCAN_INTERVAL,
 )
 from homeassistant.components.kartverket_tides.validators import (
     tide_interval,
     tide_language,
 )
+from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity
+from homeassistant.const import (
+    ATTR_ATTRIBUTION,
+    CONF_LATITUDE,
+    CONF_LONGITUDE,
+    CONF_NAME,
+    LENGTH_CENTIMETERS,
+)
+import homeassistant.util.dt as dt_util
 
 
 _LOGGER = logging.getLogger(__name__)
 
-
-CONF_INTERVAL = "tide_interval"
-CONF_LANG = "tide_language"
-CONF_ENABLE_UTC = "tide_enable_utc"
-ATTR_NEXT_HIGH_TIME = "next_high_time"
-ATTR_NEXT_HIGH_LEVEL = "next_high_level"
-ATTR_NEXT_LOW_TIME = "next_low_time"
-ATTR_NEXT_LOW_LEVEL = "next_low_level"
-ATTR_INCREASING_TEXT = "increasing_text"
-
-ATTRIBUTION = "Data provided by Kartverket under NLOD"
-DEFAULT_NAME = "Kartverket Tides"
-DEFAULT_ICON_KEY = "flow"
-SCAN_INTERVAL = timedelta(hours=2)
-
-ICONS = {
-    "ebb": "mdi:waves-arrow-left",
-    "flow": "mdi:waves-arrow-right",
-}
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
@@ -88,7 +84,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
         utc_enabled = True
 
     init_client = KartverketTideApi(
-        lat, lon, interval, lang, web_session=async_get_clientsession(hass),
+        lat, lon, interval, lang, websession=async_get_clientsession(hass),
     )
 
     await init_client.update()
@@ -122,7 +118,7 @@ class KartverketTideSensor(SensorEntity):
         """Initialize the sensor."""
         self.api = api
         self._name = name
-        self._state: int | None = None
+        self._state: Union[int, None] = None
         self._icon = ICONS[DEFAULT_ICON_KEY]
         self._attributes: dict[str, str] = {}
 
@@ -132,7 +128,7 @@ class KartverketTideSensor(SensorEntity):
         return self._name
 
     @property
-    def native_value(self) -> int | None:
+    def native_value(self) -> Union[int, None]:
         """Return the state of the sensor."""
         return self._state
 
@@ -145,7 +141,7 @@ class KartverketTideSensor(SensorEntity):
     @property
     def native_unit_of_measurement(self) -> str:
         """Return the unit this state is expressed in."""
-        return LENGTH_CM
+        return LENGTH_CENTIMETERS
 
     @property
     def icon(self) -> str:
@@ -158,12 +154,10 @@ class KartverketTideSensor(SensorEntity):
 
         self._attributes = {}
 
-        data: KystverketTideData = self.api.get_tide_data()
-        if data is None:
-            self._state = None
-            return
-
         self._state = self.api.current_waterlevel
+
+        if self.api.current_waterlevel is None:
+            return
 
         extreme_waterlevels = self.tide_extremes.data[0].waterlevels
         if extreme_waterlevels[0].flag == "low":

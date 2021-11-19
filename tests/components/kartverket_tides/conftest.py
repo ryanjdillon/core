@@ -7,7 +7,12 @@ import pytest
 
 from homeassistant.helpers.aiohttp_client import DATA_CLIENTSESSION
 from homeassistant.components.kartverket_tides.api import KartverketTideApi
-from tests.components.kartverket_tides.const import LATITUDE, LONGITUDE, LANG, INTERVAL
+from tests.components.kartverket_tides.const import (
+    TEST_CONF_LATITUDE,
+    TEST_CONF_LONGITUDE,
+    TEST_CONF_LANG,
+    TEST_CONF_INTERVAL,
+)
 
 
 @pytest.fixture
@@ -96,10 +101,10 @@ def api_factory(aioclient_mock, mock_clientsession, mock_asyncio_run):
 
     def _api(**kwargs):
         api_kwargs = {
-            "lat": LATITUDE,
-            "lon": LONGITUDE,
-            "lang": LANG,
-            "interval": INTERVAL,
+            "lat": TEST_CONF_LATITUDE,
+            "lon": TEST_CONF_LONGITUDE,
+            "lang": TEST_CONF_LANG,
+            "interval": TEST_CONF_INTERVAL,
             "websession": aioclient_mock,
         }
         api_kwargs.update(**kwargs)
